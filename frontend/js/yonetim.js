@@ -12,7 +12,7 @@
   // ---------- Rapor ----------
   function raporSatiri(m) {
     const yuzde = Number(m.doluluk_yuzde);
-    const puan = m.ortalama_puan === null ? '–' : `${m.ortalama_puan} <span class="soluk">(${m.oy_sayisi})</span>`;
+    const puan = m.ortalama_puan === null ? '–' : `<span>${m.ortalama_puan} <span class="soluk">(${m.oy_sayisi} oy)</span></span>`;
     return `<tr>
       <td data-baslik="Tarih">${Y.kisaTarih(m.tarih)}</td>
       <td data-baslik="Yemekhane">${Y.esc(m.yemekhane)}</td>

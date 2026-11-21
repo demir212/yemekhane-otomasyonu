@@ -11,7 +11,8 @@
       html += `<input type="radio" id="${id}" name="puan" value="${p}"${secili === p ? ' checked' : ''}>
                <label for="${id}" title="${p} puan">★</label>`;
     }
-    return `<fieldset class="yildizlar"><legend class="soluk" style="float:left;width:100%">Puanınız</legend>${html}</fieldset>`;
+    return `<p class="soluk" id="puan-etiket-${menuId}" style="margin:0">Puanınız</p>
+      <div class="yildizlar" role="radiogroup" aria-labelledby="puan-etiket-${menuId}">${html}</div>`;
   }
 
   function kart(m) {

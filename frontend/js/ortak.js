@@ -101,6 +101,11 @@ const Y = (() => {
             .join('')}
         </nav>
       </div>`;
+    // Telefonda menü yana kaydığı için aktif sekmeyi görünür alana getir
+    const aktif = ust.querySelector('[aria-current="page"]');
+    const gezinme = ust.querySelector('.gezinme');
+    if (aktif) gezinme.scrollLeft = aktif.offsetLeft - (gezinme.clientWidth - aktif.offsetWidth) / 2;
+
     document.getElementById('cikis').addEventListener('click', async () => {
       try { await istek('/api/oturum/cikis', { yontem: 'POST' }); } finally { location.href = '/'; }
     });

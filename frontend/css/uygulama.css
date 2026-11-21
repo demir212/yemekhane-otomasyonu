@@ -33,6 +33,7 @@
   overflow-x: auto;             /* telefonda yana kaydırılabilir menü */
   padding-bottom: 0.25rem;
   scrollbar-width: thin;
+  position: relative;           /* aktif sekmenin offsetLeft'i bu kutuya göre ölçülür */
 }
 .gezinme a {
   flex: 0 0 auto;
@@ -125,6 +126,7 @@ main.kapsayici { padding-bottom: 3rem; }
   .tablo-kart td { display: flex; justify-content: space-between; gap: 1rem; border: 0; padding: .35rem 0; text-align: right; }
   .tablo-kart td::before { content: attr(data-baslik); color: var(--metin-soluk); font-weight: 600; text-align: left; }
   .tablo-kart td.sayi { text-align: right; }
+  .tablo-kart td .cubuk { flex: 0 0 120px; margin-left: auto; align-self: center; }
 }
 
 /* ---------- Bakiye ---------- */
@@ -136,7 +138,7 @@ main.kapsayici { padding-bottom: 3rem; }
 .cubuk.yuksek span { background: var(--hata); }
 
 /* ---------- Değerlendirme yıldızları ---------- */
-.yildizlar { display: inline-flex; flex-direction: row-reverse; gap: 0.15rem; border: 0; padding: 0; margin: 0 0 .5rem; }
+.yildizlar { display: inline-flex; flex-direction: row-reverse; gap: 0.15rem; margin: 0 0 .5rem; position: relative; }
 .yildizlar input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .yildizlar label { font-size: 1.75rem; color: var(--cizgi); cursor: pointer; margin: 0; line-height: 1; padding: 0.15rem; }
 .yildizlar input:checked ~ label,
