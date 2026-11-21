@@ -16,7 +16,7 @@ KULLANICI=7   # Mehmet Yıldız (öğrenci)
 baslik() { printf '\n==================== %s ====================\n' "$*" | tee -a "$CIKTI"; }
 calistir() {
     # Komutu (parolasız haliyle) ve çıktısını kaydet
-    echo "\$ $*" | sed 's/-p[^ ]*/-p***/g' | tee -a "$CIKTI"
+    echo "\$ $*" | sed 's/ -p[^ ]*/ -p***/g' | tee -a "$CIKTI"
     "$@" 2>&1 | grep -v "Using a password on the command line" | tee -a "$CIKTI"
 }
 bekle_healthy() {
