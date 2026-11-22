@@ -1,27 +1,25 @@
-// Oturum deposu (Aşama 2: bellek içi)
-// Not: Uygulama container'ı yeniden başlarsa oturumlar kaybolur; Aşama 3'te Redis'e taşınır.
+// Oturum deposu (Aşama 3: Redis)
+//   Anahtar: oturum:{token}   Değer: {kullanici_id, rol, ad, soyad} (JSON)
+//   Süre: 30 dakika; her istekte yeniden 30 dakikaya çıkar (kayan süre). Çıkışta silinir.
+// Oturumlar uygulama container'ının dışında durduğu için container yeniden başlasa da
+// kullanıcılar oturumdan düşmez.
 const ayar = require('../ayarlar');
+const { redis } = require('../veri/redisBaglanti');
 
-const oturumlar = new Map(); // token -> { veri, bitis }
+const anahtar = (token) => `oturum:${token}`;
 
 async function kaydet(token, veri) {
-  oturumlar.set(token, { veri, bitis: Date.now() + ayar.oturumSuresi * 1000 });
+  await redis.set(anahtar(token), JSON.stringify(veri), { EX: ayar.oturumSuresi });
 }
 
-// Oturumu getirir ve süresini yeniden başlatır (her istekte 30 dakika)
+// GETEX: değeri okur ve süreyi tek komutta yeniden 30 dakikaya ayarlar
 async function getir(token) {
-  const kayit = oturumlar.get(token);
-  if (!kayit) return null;
-  if (kayit.bitis < Date.now()) {
-    oturumlar.delete(token);
-    return null;
-  }
-  kayit.bitis = Date.now() + ayar.oturumSuresi * 1000;
-  return kayit.veri;
+  const json = await redis.getEx(anahtar(token), { EX: ayar.oturumSuresi });
+  return json ? JSON.parse(json) : null;
 }
 
 async function sil(token) {
-  oturumlar.delete(token);
+  await redis.del(anahtar(token));
 }
 
 module.exports = { kaydet, getir, sil };

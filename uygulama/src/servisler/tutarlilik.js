@@ -4,20 +4,22 @@
 // bir yazma yaptıktan hemen sonra replikada eski veriyi görebilir (ör. rezervasyondan sonra
 // eski bakiye). Bu yüzden bir kullanıcı yazma yaptıktan sonra kısa bir süre o kullanıcının
 // okumaları kaynaktan (mysql-primary) yapılır.
+//
+// İşaret Redis'te tutulur: yazdi:{kullanici_id}, 10 saniye sonra kendiliğinden silinir.
+// Böylece uygulama yeniden başlasa (ya da birden çok kopya çalışsa) da kural bozulmaz.
 const ayar = require('../ayarlar');
 const { yazma, okuma } = require('../veri/baglanti');
+const { redis } = require('../veri/redisBaglanti');
 
-const sonYazma = new Map(); // kullanici_id -> zaman (ms)
+const anahtar = (kullaniciId) => `yazdi:${kullaniciId}`;
 
 async function yazmaYapildi(kullaniciId) {
-  sonYazma.set(kullaniciId, Date.now());
+  await redis.set(anahtar(kullaniciId), '1', { EX: ayar.kaynaktanOkumaSuresi });
 }
 
 // Bu kullanıcının okuması hangi havuzdan yapılmalı?
 async function okumaHavuzu(kullaniciId) {
-  const zaman = sonYazma.get(kullaniciId);
-  if (zaman && Date.now() - zaman < ayar.kaynaktanOkumaSuresi * 1000) return yazma;
-  return okuma;
+  return (await redis.exists(anahtar(kullaniciId))) ? yazma : okuma;
 }
 
 module.exports = { yazmaYapildi, okumaHavuzu };
