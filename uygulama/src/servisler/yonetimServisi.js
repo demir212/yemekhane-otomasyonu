@@ -1,6 +1,8 @@
 // İş katmanı · yönetici paneli
 const { UygulamaHatasi } = require('../hatalar');
+const { yazma } = require('../veri/baglanti');
 const yonetimVeri = require('../veri/yonetimVeri');
+const menuServisi = require('./menuServisi');
 const tutarlilik = require('./tutarlilik');
 const dogrula = require('./dogrula');
 
@@ -49,24 +51,30 @@ async function menuOlustur(oturum, govde) {
     tarih: dogrula.tarih(govde.tarih),
     ...fiyatlariDogrula(govde),
   };
+  let menuId;
   try {
-    const menuId = await yonetimVeri.menuOlustur(menu);
-    await tutarlilik.yazmaYapildi(oturum.kullanici_id);
-    return { menu_id: menuId };
+    menuId = await yonetimVeri.menuOlustur(menu);
   } catch (hata) {
     throw veritabaniHatasi(hata);
   }
+  await tutarlilik.yazmaYapildi(oturum.kullanici_id);
+  await menuServisi.onbellegiYenile(menu.yemekhane_id, menu.tarih, menu.ogun_id);
+  return { menu_id: menuId };
 }
 
 async function menuGuncelle(oturum, menuId, govde) {
   const id = dogrula.id(menuId, 'Menü');
   const degisiklik = fiyatlariDogrula(govde);
+  // Önbellek anahtarı için menünün yemekhane/tarih/öğün bilgisi kaynaktan alınır
+  const mevcut = await yonetimVeri.menuGetir(yazma, id);
+  if (!mevcut) throw new UygulamaHatasi('Menü bulunamadı.', 404);
   try {
     await yonetimVeri.menuGuncelle(id, degisiklik);
-    await tutarlilik.yazmaYapildi(oturum.kullanici_id);
   } catch (hata) {
     throw veritabaniHatasi(hata);
   }
+  await tutarlilik.yazmaYapildi(oturum.kullanici_id);
+  await menuServisi.onbellegiYenile(mevcut.yemekhane_id, mevcut.tarih, mevcut.ogun_id);
   return { menu_id: id };
 }
 

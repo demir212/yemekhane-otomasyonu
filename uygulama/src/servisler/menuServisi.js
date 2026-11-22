@@ -1,6 +1,7 @@
 // İş katmanı · günün menüsü ve haftalık menü
-const { okuma } = require('../veri/baglanti');
+const { okuma, yazma } = require('../veri/baglanti');
 const menuVeri = require('../veri/menuVeri');
+const menuOnbellegi = require('./menuOnbellegi');
 const rezervasyonVeri = require('../veri/rezervasyonVeri');
 const tutarlilik = require('./tutarlilik');
 const dogrula = require('./dogrula');
@@ -51,9 +52,22 @@ function menuOlustur(satirlar) {
   };
 }
 
-// Menü içeriği (yemekler, kalori, alerjen). Değişmeyen veri: replikadan okunur.
+// Menü içeriği (yemekler, kalori, alerjen). Önce Redis önbelleğine bakılır;
+// yoksa replikadan okunur ve günün sonuna kadar önbelleğe yazılır.
 async function menuIcerigi(yemekhaneId, tarih, ogunId) {
-  return menuOlustur(await menuVeri.menuDetay(okuma, yemekhaneId, tarih, ogunId));
+  return menuOnbellegi.getir(yemekhaneId, tarih, ogunId, async () =>
+    menuOlustur(await menuVeri.menuDetay(okuma, yemekhaneId, tarih, ogunId)));
+}
+
+// Yönetici menüyü oluşturduğunda/değiştirdiğinde çağrılır: eski anahtar silinir ve
+// yeni içerik KAYNAKTAN okunup önbelleğe yazılır. Replikadan okunsaydı, replika henüz
+// güncellenmemişse eski menü yeniden önbelleğe girip gün sonuna kadar kalabilirdi.
+async function onbellegiYenile(yemekhaneId, tarih, ogunId) {
+  await menuOnbellegi.sil(yemekhaneId, tarih, ogunId);
+  const menu = menuOlustur(await menuVeri.menuDetay(yazma, yemekhaneId, tarih, ogunId));
+  if (await menuOnbellegi.yaz(yemekhaneId, tarih, ogunId, menu)) {
+    console.log(`[önbellek] YENİLENDİ ${menuOnbellegi.anahtar(yemekhaneId, tarih, ogunId)} → kaynaktan okundu, önbelleğe yazıldı`);
+  }
 }
 
 async function gununMenusu(oturum, sorgu) {
@@ -113,4 +127,4 @@ async function haftalikMenu(oturum, sorgu) {
   return { baslangic, bitis, gunler };
 }
 
-module.exports = { referanslar, gununMenusu, haftalikMenu, menuIcerigi, fiyatSec };
+module.exports = { referanslar, gununMenusu, haftalikMenu, menuIcerigi, onbellegiYenile, fiyatSec };
