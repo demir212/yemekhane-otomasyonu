@@ -1,0 +1,108 @@
+
+==================== Tarih ====================
+$ date +%Y-%m-%d %H:%M:%S %z
+2026-11-22 15:18:40 +0300
+
+==================== 1. Oturum: oturum:{token}, 30 dk, her istekte yenilenir ====================
+# Mehmet Yıldız giriş yaptı; çerezdeki belirteç: f643c1e3… (64 hex karakter)
+$ docker compose exec -T redis redis-cli --scan --pattern oturum:*
+oturum:050f4bcefc22b9580ba53f8eac3104d060b9fa37edd69efe10825fb06e4abbcf
+oturum:c25f7d4c796b9da58968afe546d98cf766f6b9ca531b84c7162ddde7f3d76ab3
+oturum:833064faefadbb3320b0db14f8a58d57ed6bd324c5bec4a472d4c1823c595191
+oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+$ docker compose exec -T redis redis-cli GET oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+{"kullanici_id":7,"rol":"ogrenci","ad":"Mehmet","soyad":"Yıldız"}
+$ docker compose exec -T redis redis-cli TTL oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+1799
+# 6 saniye bekleniyor; süre azalır...
+$ docker compose exec -T redis redis-cli TTL oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+1792
+# Herhangi bir istek süreyi yeniden 1800 saniyeye çıkarır:
+$ curl -s -H 'Cookie: oturum=f643c1e3…' http://localhost:8080/api/ben -o /dev/null -w HTTP %{http_code}
+HTTP 200
+$ docker compose exec -T redis redis-cli TTL oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+1800
+
+==================== 2. Menü önbelleği: ilk istek veritabanından, ikincisi Redis'ten ====================
+# Temiz başlangıç için anahtar silinir
+$ docker compose exec -T redis redis-cli DEL menu:1:2026-11-23:2
+1
+# 1. istek
+$ curl -s -H 'Cookie: oturum=f643c1e3…' http://localhost:8080/api/menu?yemekhane_id=1&tarih=2026-11-23&ogun_id=2 -o /dev/null -w HTTP %{http_code}
+HTTP 200
+# 2. istek (aynı menü)
+$ curl -s -H 'Cookie: oturum=f643c1e3…' http://localhost:8080/api/menu?yemekhane_id=1&tarih=2026-11-23&ogun_id=2 -o /dev/null -w HTTP %{http_code}
+HTTP 200
+# Uygulama günlüğü: ilk istek ISKA (veritabanı), ikinci istek ISABET (Redis)
+$ docker compose logs --since 2026-11-22T12:18:50Z uygulama | grep '\[önbellek\]'
+[önbellek] ISKA   menu:1:2026-11-23:2 → veritabanından okundu, önbelleğe yazıldı
+[önbellek] ISABET menu:1:2026-11-23:2 → Redis'ten okundu
+$ docker compose exec -T redis redis-cli --scan --pattern menu:*
+menu:1:2026-12-04:2
+menu:1:2026-11-22:1
+menu:1:2026-11-24:1
+menu:1:2026-11-27:3
+menu:1:2026-11-28:1
+menu:1:2026-11-27:2
+menu:1:2026-11-28:2
+menu:1:2026-11-23:2
+menu:1:2026-11-25:1
+menu:1:2026-11-23:3
+menu:1:2026-11-26:2
+menu:1:2026-11-22:2
+menu:1:2026-11-26:3
+menu:1:2026-11-26:1
+menu:1:2026-11-22:3
+menu:1:2026-11-24:2
+menu:1:2026-11-28:3
+menu:1:2026-11-25:3
+menu:1:2026-11-23:1
+menu:1:2026-11-27:1
+menu:1:2026-11-24:3
+menu:1:2026-11-25:2
+$ docker compose exec -T redis redis-cli TTL menu:1:2026-11-23:2
+117666
+$ docker compose exec -T redis redis-cli EXPIRETIME menu:1:2026-11-23:2
+1795467599
+# Anahtarın silineceği an: 2026-11-23 23:59:59 +0300 (İstanbul) — menü gününün sonu
+$ docker compose exec -T redis redis-cli GET menu:1:2026-11-23:2 | cut -c1-300
+{"menu_id":50,"tarih":"2026-11-23","yemekhane_id":1,"yemekhane":"Merkez Yemekhane","ogun_id":2,"ogun":"Öğle","rezervasyon_son":"2026-11-23 10:00:00","ogrenci_fiyati":40,"personel_fiyati":90,"toplam_kalori":1080,"tamami_vejetaryen":false,"kategoriler":[{"kategori":"Çorba","yemekler":[{"id":6,"ad":
+
+==================== 3. Yönetici menüyü değiştirir: eski anahtar silinir, arayüz yeni menüyü gösterir ====================
+# Leyla Arslan (yönetici) giriş yaptı
+# Menü 50: öğrenci fiyatı 40 TL → 45 TL yapılacak
+# Önbellekteki fiyat (değişiklikten önce):
+$ docker compose exec -T redis redis-cli GET menu:1:2026-11-23:2 | grep -o '"ogrenci_fiyati":[0-9.]*'
+"ogrenci_fiyati":40
+$ curl -s -H 'Cookie: oturum=bb59344a…' -X PUT -H Content-Type: application/json -d {"ogrenci_fiyati":45,"personel_fiyati":90,"yemek_idler":[6,11,25,29]} http://localhost:8080/api/yonetim/menuler/50
+{"menu_id":50}
+# Uygulama günlüğü: eski anahtar silindi, yeni içerik kaynaktan okunup yazıldı
+$ docker compose logs --since 2026-11-22T12:18:55Z uygulama | grep '\[önbellek\]'
+[önbellek] SİLİNDİ menu:1:2026-11-23:2 (yönetici menüyü değiştirdi; eski kayıt vardı)
+[önbellek] YENİLENDİ menu:1:2026-11-23:2 → kaynaktan okundu, önbelleğe yazıldı
+# Önbellekteki fiyat (değişiklikten sonra):
+$ docker compose exec -T redis redis-cli GET menu:1:2026-11-23:2 | grep -o '"ogrenci_fiyati":[0-9.]*'
+"ogrenci_fiyati":45
+# Öğrencinin gördüğü menü (arayüzün çağırdığı API):
+$ curl -s -H 'Cookie: oturum=f643c1e3…' 'http://localhost:8080/api/menu?...' | grep -o '"fiyat":[0-9.]*'
+"fiyat":45
+
+==================== 4. Uygulama container'ı yeniden başlatılır: oturum düşmez ====================
+$ docker compose restart uygulama
+ Container yemekhane-uygulama-1 Restarting 
+ Container yemekhane-uygulama-1 Started 
+$ docker compose ps uygulama --format {{.Service}}  {{.Status}}
+uygulama  Up 12 seconds (healthy)
+# Aynı çerezle istek (yeniden giriş yapılmadan):
+$ curl -s -H 'Cookie: oturum=f643c1e3…' http://localhost:8080/api/ben
+{"id":7,"ad":"Mehmet","soyad":"Yıldız","eposta":"mehmet.yildiz@ogr.kampus.edu.tr","rol":"ogrenci","ogrenci_no":"251229002","bakiye":405}
+
+==================== 5. Çıkış: oturum anahtarı silinir ====================
+$ docker compose exec -T redis redis-cli EXISTS oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+1
+$ curl -s -H 'Cookie: oturum=f643c1e3…' -X POST http://localhost:8080/api/oturum/cikis
+{"tamam":true}
+$ docker compose exec -T redis redis-cli EXISTS oturum:f643c1e36a3d9496a90843172f18442f31de2691de8732dd33d7e2b93f48dc86
+0
+$ curl -s -H 'Cookie: oturum=f643c1e3…' http://localhost:8080/api/ben
+{"hata":"Oturumunuz sona erdi. Lütfen yeniden giriş yapın."}
