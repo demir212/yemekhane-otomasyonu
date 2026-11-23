@@ -172,6 +172,10 @@ main.kapsayici { padding-bottom: 3rem; }
 .bilgi-liste { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
 .bilgi-liste dt { color: var(--metin-soluk); font-weight: 600; }
 .bilgi-liste dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .bilgi-liste { grid-template-columns: 1fr; gap: 0; }
+  .bilgi-liste dd { margin-bottom: 0.5rem; }
+}
 .alerjen-secim {
   border: 0; padding: 0; margin: 0 0 1rem;
   display: grid; gap: 0.25rem 1rem; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
