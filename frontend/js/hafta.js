@@ -8,6 +8,7 @@
     return `<article class="ogun-kart">
       <h3><span>${Y.esc(m.ogun)}</span><span class="fiyat" style="font-size:1rem">${Y.para(m.fiyat)}</span></h3>
       <p>${m.yemekler.map(Y.esc).join(', ')}</p>
+      ${Y.alerjenUyarisi(m.alerjen_uyarisi)}
       <p class="soluk">${m.toplam_kalori ?? '–'} kcal · Boş yer: <strong>${m.bos_yer}</strong> / ${m.kapasite}
         · Son: ${Y.saat(m.rezervasyon_son)}</p>
       ${Y.rezervasyonDugmesi(m)}
@@ -38,9 +39,9 @@
     Y.bildirimGizle(kutu);
     dugme.disabled = true;
     try {
-      const sonuc = await Y.rezervasyonYap(dugme.dataset.rezervasyon);
+      const sonuc = await Y.rezervasyonYap(dugme.dataset.rezervasyon, dugme.dataset.porsiyon);
       await yukle();
-      Y.bildir(kutu, `Rezervasyon yapıldı. Ücret: ${Y.para(sonuc.ucret)}, yeni bakiye: ${Y.para(sonuc.bakiye)}`, 'basari');
+      Y.bildir(kutu, Y.rezervasyonMesaji(sonuc), 'basari');
     } catch (hata) {
       Y.bildir(kutu, hata.message);
       dugme.disabled = false;

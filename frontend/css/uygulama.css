@@ -152,3 +152,29 @@ main.kapsayici { padding-bottom: 3rem; }
 .yemek-secim legend { font-weight: 600; font-size: var(--boyut-kucuk); }
 .secim { display: flex; align-items: center; gap: .5rem; font-weight: 400; margin: .2rem 0; cursor: pointer; }
 .secim input { width: auto; }
+
+/* ---------- Aşama 4: porsiyon seçimi ---------- */
+.porsiyon-secim { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.porsiyon-secim .dugme { width: 100%; padding-inline: 0.5rem; }
+@media (max-width: 360px) { .porsiyon-secim { grid-template-columns: 1fr; } }
+.fiyat-kutu { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* ---------- Aşama 4: alerjen uyarısı ---------- */
+.alerjen-uyari {
+  background: var(--hata-zemin); color: var(--hata);
+  border-left: 4px solid var(--hata); border-radius: var(--kose);
+  padding: 0.5rem 0.75rem; margin: 0.75rem 0; font-size: var(--boyut-kucuk);
+}
+.ogun-kart .alerjen-uyari { margin: 0 0 0.5rem; }
+.yemek-liste li.yemek-uyari .yemek-ad { color: var(--hata); }
+
+/* ---------- Aşama 4: profil ---------- */
+.bilgi-liste { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
+.bilgi-liste dt { color: var(--metin-soluk); font-weight: 600; }
+.bilgi-liste dd { margin: 0; overflow-wrap: anywhere; }
+.alerjen-secim {
+  border: 0; padding: 0; margin: 0 0 1rem;
+  display: grid; gap: 0.25rem 1rem; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.alerjen-secim .secim { min-height: 40px; }
+.gorunmez { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

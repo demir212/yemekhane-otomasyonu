@@ -82,6 +82,7 @@ const Y = (() => {
       ['/rezervasyonlarim.html', 'Rezervasyonlarım'],
       ['/bakiye.html', 'Bakiye'],
       ['/degerlendirme.html', 'Değerlendirme'],
+      ['/profil.html', 'Profil'],
     ];
     if (ben.rol === 'yonetici') baglantilar.push(['/yonetim.html', 'Yönetim']);
 
@@ -136,26 +137,48 @@ const Y = (() => {
     return ref;
   }
 
-  // Menü kartlarındaki rezervasyon düğmesi: durumuna göre etkin ya da pasif
+  const PORSIYON_ADI = { tam: 'tam porsiyon', yarim: 'yarım porsiyon' };
+
+  // Menü kartlarındaki rezervasyon düğmesi: durumuna göre etkin ya da pasif.
+  // Yarım porsiyon sunulan öğünlerde (yarim_fiyat dolu) iki düğme çıkar: tam / yarım.
   function rezervasyonDugmesi(menu) {
     const r = menu.rezervasyon;
-    if (r && r.durum === 'aktif') return '<span class="etiket etiket-aktif">Rezervasyonunuz var</span>';
-    if (r && r.durum === 'kullanildi') return '<span class="etiket etiket-kullanildi">Kullanıldı</span>';
+    const porsiyon = r && r.porsiyon === 'yarim' ? ` · ${PORSIYON_ADI.yarim}` : '';
+    if (r && r.durum === 'aktif') return `<span class="etiket etiket-aktif">Rezervasyonunuz var${porsiyon}</span>`;
+    if (r && r.durum === 'kullanildi') return `<span class="etiket etiket-kullanildi">Kullanıldı${porsiyon}</span>`;
     if (menu.suresi_doldu) return '<button class="dugme" disabled>Rezervasyon süresi doldu</button>';
     if (menu.bos_yer <= 0) return '<button class="dugme" disabled>Kapasite dolu</button>';
-    return `<button class="dugme" data-rezervasyon="${menu.menu_id}">Rezervasyon yap · ${para(menu.fiyat)}</button>`;
+    if (menu.yarim_fiyat == null) {
+      return `<button class="dugme" data-rezervasyon="${menu.menu_id}" data-porsiyon="tam">Rezervasyon yap · ${para(menu.fiyat)}</button>`;
+    }
+    return `<div class="porsiyon-secim" role="group" aria-label="Porsiyon seçin">
+      <button class="dugme" data-rezervasyon="${menu.menu_id}" data-porsiyon="tam">Tam porsiyon · ${para(menu.fiyat)}</button>
+      <button class="dugme dugme-ikincil" data-rezervasyon="${menu.menu_id}" data-porsiyon="yarim">Yarım porsiyon · ${para(menu.yarim_fiyat)}</button>
+    </div>`;
   }
 
-  async function rezervasyonYap(menuId) {
-    const sonuc = await istek('/api/rezervasyonlar', { yontem: 'POST', govde: { menu_id: Number(menuId) } });
+  async function rezervasyonYap(menuId, porsiyon = 'tam') {
+    const sonuc = await istek('/api/rezervasyonlar', { yontem: 'POST', govde: { menu_id: Number(menuId), porsiyon } });
     bakiyeGoster(sonuc.bakiye);
     return sonuc;
+  }
+
+  function rezervasyonMesaji(sonuc) {
+    return `Rezervasyon yapıldı (${PORSIYON_ADI[sonuc.porsiyon] || PORSIYON_ADI.tam}). `
+      + `Ücret: ${para(sonuc.ucret)}, yeni bakiye: ${para(sonuc.bakiye)}`;
+  }
+
+  // Profilde seçilen alerjenler menüde varsa uyarı kutusu (yoksa boş metin)
+  function alerjenUyarisi(alerjenler) {
+    if (!alerjenler || alerjenler.length === 0) return '';
+    return `<p class="alerjen-uyari" role="alert"><span aria-hidden="true">⚠</span>
+      Alerjen uyarısı: bu menüde <strong>${alerjenler.map(esc).join(', ')}</strong> var.</p>`;
   }
 
   return {
     ROL_ADI, DURUM_ADI, istek, esc, para, tarihYaz, kisaTarih, saat, bugun, gunEkle,
     bildir, bildirimGizle, bakiyeGoster, sayfaBaslat, referanslariDoldur,
-    rezervasyonDugmesi, rezervasyonYap,
+    rezervasyonDugmesi, rezervasyonYap, rezervasyonMesaji, alerjenUyarisi, PORSIYON_ADI,
     get ben() { return ben; },
   };
 })();

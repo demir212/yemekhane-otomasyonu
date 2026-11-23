@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profil · Yemekhane</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <link rel="stylesheet" href="/css/uygulama.css">
+</head>
+<body>
+  <header id="ust"></header>
+  <main class="kapsayici">
+    <h1>Profil</h1>
+
+    <section class="panel">
+      <h2>Bilgilerim</h2>
+      <dl class="bilgi-liste" id="bilgiler"></dl>
+    </section>
+
+    <section class="panel">
+      <h2>Alerjenlerim</h2>
+      <p class="soluk">Seçtiğiniz alerjenleri içeren yemekler menüde uyarıyla gösterilir.</p>
+      <p id="bildirim" hidden></p>
+      <form id="alerjen-formu" novalidate>
+        <fieldset class="alerjen-secim" id="alerjenler">
+          <legend class="gorunmez">Alerjenler</legend>
+        </fieldset>
+        <button class="dugme" type="submit">Kaydet</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="/js/ortak.js"></script>
+  <script src="/js/profil.js"></script>
+</body>
+</html>

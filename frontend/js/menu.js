@@ -7,8 +7,12 @@
   function yemekSatiri(y) {
     const etiketler = [];
     if (y.vejetaryen) etiketler.push('<span class="etiket etiket-veg">Vejetaryen</span>');
-    y.alerjenler.forEach((a) => etiketler.push(`<span class="etiket">${Y.esc(a)}</span>`));
-    return `<li>
+    // Profilde seçilen alerjen: kırmızı uyarı etiketi
+    const uyarili = y.uyari_alerjenler || [];
+    y.alerjenler.forEach((a) => etiketler.push(uyarili.includes(a)
+      ? `<span class="etiket etiket-uyari" title="Profilinizde seçtiğiniz alerjen">⚠ ${Y.esc(a)}</span>`
+      : `<span class="etiket">${Y.esc(a)}</span>`));
+    return `<li${uyarili.length ? ' class="yemek-uyari"' : ''}>
       <span class="yemek-ad">${Y.esc(y.ad)}</span>
       <span class="soluk">${y.kalori} kcal</span>
       ${etiketler.join(' ')}
@@ -22,8 +26,12 @@
           <h2>${Y.esc(m.yemekhane)} · ${Y.esc(m.ogun)}</h2>
           <p class="soluk">${Y.tarihYaz(m.tarih)}</p>
         </div>
-        <span class="fiyat">${Y.para(m.fiyat)}</span>
+        <div class="fiyat-kutu">
+          <span class="fiyat">${Y.para(m.fiyat)}</span>
+          ${m.yarim_fiyat != null ? `<span class="soluk">Yarım porsiyon: ${Y.para(m.yarim_fiyat)}</span>` : ''}
+        </div>
       </div>
+      ${Y.alerjenUyarisi(m.alerjen_uyarisi)}
       ${m.kategoriler.map((k) => `
         <div class="kategori">
           <h3>${Y.esc(k.kategori)}</h3>
@@ -58,9 +66,9 @@
     if (!dugme) return;
     dugme.disabled = true;
     try {
-      const sonuc = await Y.rezervasyonYap(dugme.dataset.rezervasyon);
+      const sonuc = await Y.rezervasyonYap(dugme.dataset.rezervasyon, dugme.dataset.porsiyon);
       await yukle();
-      Y.bildir(kutu, `Rezervasyon yapıldı. Ücret: ${Y.para(sonuc.ucret)}, yeni bakiye: ${Y.para(sonuc.bakiye)}`, 'basari');
+      Y.bildir(kutu, Y.rezervasyonMesaji(sonuc), 'basari');
     } catch (hata) {
       Y.bildir(kutu, hata.message);
       dugme.disabled = false;

@@ -13,6 +13,7 @@
       <td data-baslik="Tarih">${Y.kisaTarih(r.tarih)}</td>
       <td data-baslik="Öğün">${Y.esc(r.ogun)}</td>
       <td data-baslik="Yemekhane">${Y.esc(r.yemekhane)}</td>
+      <td data-baslik="Porsiyon">${r.porsiyon === 'yarim' ? 'Yarım' : 'Tam'}</td>
       <td data-baslik="Ücret" class="sayi">${Y.para(r.ucret)}</td>
       <td data-baslik="Durum"><span class="etiket etiket-${r.durum}">${Y.DURUM_ADI[r.durum]}</span></td>
       <td data-baslik="">${iptal}</td>
@@ -23,7 +24,7 @@
     const secili = rezervasyonlar.filter((r) => !filtre.value || r.durum === filtre.value);
     liste.innerHTML = secili.length
       ? secili.map(satir).join('')
-      : '<tr><td colspan="6" class="soluk">Kayıt yok.</td></tr>';
+      : '<tr><td colspan="7" class="soluk">Kayıt yok.</td></tr>';
   }
 
   async function yukle() {
