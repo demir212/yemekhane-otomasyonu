@@ -23,6 +23,11 @@
   th, td { border: 1px solid var(--cizgi); padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
   th { background: var(--zemin); }
   .bolum { break-before: page; }
+  .dosya { font-size: 9pt; font-weight: 600; color: var(--ana); margin: 3mm 0 1mm; break-after: avoid; }
+  .dosya + pre { margin-bottom: 2mm; }
+  .kod p { margin-bottom: 1.5mm; }
+  .kod .dosya { margin: 2mm 0 0.6mm; font-size: 8.5pt; }
+  .kod pre { font-size: 7.4pt; line-height: 1.3; padding: 1.6mm 2.5mm; margin-bottom: 1.2mm; }
   .not { border-left: 3px solid var(--ana); background: var(--zemin); padding: 2mm 3mm; margin: 0 0 3.5mm; }
   .ekranlar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 0 0 4mm; }
   .ekranlar.dort { grid-template-columns: repeat(4, 1fr); }
@@ -184,6 +189,65 @@ HTTP 200</pre>
   <p><b>Okuma örneği:</b> <code>GET /api/menu</code> → <code>menuKontrolcu.gununMenusu</code> → <code>menuServisi.gununMenusu</code>: menü içeriği önce
      Redis'ten, yoksa <code>menuVeri.menuDetay(okuma, …)</code> ile replikadaki <code>v_menu_detay</code> görünümünden okunur; doluluk
      <code>v_menu_doluluk</code>'tan gelir; fiyat kullanıcının rolüne göre servis katmanında seçilir.</p>
+</section>
+
+<section class="bolum kod">
+  <h3>Kod örneği: <code>POST /api/rezervasyonlar</code> isteğinin uygulama içindeki yolu</h3>
+  <p>Aşağıdaki parçalar depodaki koddan değiştirilmeden alınmıştır (dosya ve satır numarasıyla). İstek yukarıdan aşağıya bu sırayla ilerler.</p>
+  <p class="dosya">① Arayüz · <code>frontend/js/ortak.js:160</code></p>
+  <pre>async function rezervasyonYap(menuId, porsiyon = 'tam') {
+  const sonuc = await istek('/api/rezervasyonlar', { yontem: 'POST', govde: { menu_id: Number(menuId), porsiyon } });
+  bakiyeGoster(sonuc.bakiye);
+  return sonuc;
+}</pre>
+  <p class="dosya">② Rota · <code>uygulama/src/rotalar.js:13, 24, 32</code></p>
+  <pre>const sar = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+r.use(oturumGerekli);
+r.post('/rezervasyonlar', sar(rezervasyon.olustur));</pre>
+  <p class="dosya">③ Ara katman (oturum, Redis'ten) · <code>uygulama/src/ara/oturumKontrol.js:20</code></p>
+  <pre>async function oturumGerekli(req, res, next) {
+  try {
+    const oturum = await oturumServisi.oturumGetir(tokenAl(req));
+    if (!oturum) return res.status(401).json({ hata: 'Oturumunuz sona erdi. Lütfen yeniden giriş yapın.' });
+    req.oturum = oturum;
+    next();
+  } catch (hata) {
+    next(hata);
+  }
+}</pre>
+  <p class="dosya">④ Controller (SQL ve kural yok) · <code>uygulama/src/kontrolculer/rezervasyonKontrolcu.js:8</code></p>
+  <pre>async function olustur(req, res) {
+  res.status(201).json(await rezervasyonServisi.rezervasyonYap(req.oturum, req.body));
+}</pre>
+  <p class="dosya">⑤ Servis (doğrulama ve kurallar) · <code>uygulama/src/servisler/rezervasyonServisi.js:9</code></p>
+  <pre>async function rezervasyonYap(oturum, govde) {
+  const menuId = dogrula.id(govde.menu_id, 'Menü');
+  // Aşama 4: porsiyon gönderilmezse tam porsiyon
+  const porsiyon = govde.porsiyon ?? 'tam';
+  if (!PORSIYONLAR.includes(porsiyon)) throw new UygulamaHatasi('Geçersiz porsiyon seçimi.');
+  // Kapasite, son saat, bakiye ve "kahvaltıda yarım porsiyon yok" kontrolleri yordamın içindedir
+  const sonuc = await rezervasyonVeri.rezervasyonYap(oturum.kullanici_id, menuId, porsiyon);
+  await tutarlilik.yazmaYapildi(oturum.kullanici_id);
+  // Dönen bakiye yordamdan, yani kaynaktan gelir: replika gecikmesinden etkilenmez
+  return sonuc;
+}</pre>
+  <p class="dosya">⑥ Veri katmanı (stored procedure; <code>yazma</code> = mysql-primary havuzu) · <code>uygulama/src/veri/rezervasyonVeri.js:6</code> ve <code>veri/baglanti.js:28</code></p>
+  <pre>function rezervasyonYap(kullaniciId, menuId, porsiyon) {
+  return yordamCagir('CALL sp_rezervasyon_yap(?, ?, ?)', [kullaniciId, menuId, porsiyon]);
+}
+
+async function yordamCagir(sql, parametreler) {
+  const [sonuc] = await yazma.query(sql, parametreler);
+  return sonuc[0][0];
+}</pre>
+  <p class="dosya">⑦ Hata yolu: yordamın SIGNAL mesajı arayüze aynen gider · <code>uygulama/src/ara/hataYakalayici.js:11</code></p>
+  <pre>  // Stored procedure hatası: SQLSTATE 45000 / MySQL 1644. Mesaj değiştirilmeden iletilir.
+  if (hata.errno === 1644) {
+    return res.status(400).json({ hata: hata.sqlMessage });
+  }</pre>
+  <p><b>Yanıt:</b> başarıda <code>201 {"rezervasyon_id":370,"ucret":24,"bakiye":681,"porsiyon":"yarim"}</code>; hata durumunda örneğin
+     <code>400 {"hata":"Bakiye yetersiz."}</code>. Arayüzdeki <code>istek()</code> fonksiyonu (<code>ortak.js:33</code>) hata yanıtında
+     <code>throw new Error(veri.hata)</code> ile mesajı sayfaya taşır.</p>
 </section>
 
 <section class="bolum">
