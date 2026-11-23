@@ -7,6 +7,7 @@ const rezervasyon = require('./kontrolculer/rezervasyonKontrolcu');
 const bakiye = require('./kontrolculer/bakiyeKontrolcu');
 const degerlendirme = require('./kontrolculer/degerlendirmeKontrolcu');
 const yonetim = require('./kontrolculer/yonetimKontrolcu');
+const profil = require('./kontrolculer/profilKontrolcu');
 
 // Express 4 async hataları yakalamaz: hatayı hata ara katmanına iletir
 const sar = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -36,6 +37,10 @@ r.post('/bakiye/yukle', sar(bakiye.yukle));
 
 r.get('/degerlendirmeler', sar(degerlendirme.listele));
 r.post('/degerlendirmeler', sar(degerlendirme.kaydet));
+
+// Profil · alerjen seçimi (Aşama 4)
+r.get('/profil/alerjenler', sar(profil.alerjenler));
+r.put('/profil/alerjenler', sar(profil.alerjenleriKaydet));
 
 // Yönetici paneli
 r.use('/yonetim', rolGerekli('yonetici'));

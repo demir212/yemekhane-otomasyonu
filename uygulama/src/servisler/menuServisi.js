@@ -4,11 +4,33 @@ const menuVeri = require('../veri/menuVeri');
 const menuOnbellegi = require('./menuOnbellegi');
 const rezervasyonVeri = require('../veri/rezervasyonVeri');
 const tutarlilik = require('./tutarlilik');
+const profilServisi = require('./profilServisi');
 const dogrula = require('./dogrula');
 
 // Kural: öğrenci öğrenci fiyatını, personel ve yönetici personel fiyatını öder
 function fiyatSec(rol, menu) {
   return rol === 'ogrenci' ? menu.ogrenci_fiyati : menu.personel_fiyati;
+}
+
+// Kural (Aşama 4): yarım porsiyon = tam fiyat × öğünün oranı (öğle/akşam 0.60).
+// Oran yoksa (kahvaltı) yarım porsiyon seçilemez → null.
+// Kesin ücret yordamda hesaplanır (sp_rezervasyon_yap, aynı ROUND(…, 2)); burada gösterim içindir.
+function yarimFiyat(fiyat, oran) {
+  return oran == null ? null : Math.round(fiyat * oran * 100) / 100;
+}
+
+// Kural (Aşama 4): kullanıcının profilinde seçtiği alerjenleri içeren yemekler uyarıyla gösterilir.
+// harita: Map(alerjen_id -> ad). Önbellekteki menü kullanıcıdan bağımsızdır; uyarı burada eklenir.
+function alerjenUyarisiEkle(menu, harita) {
+  const kategoriler = menu.kategoriler.map((k) => ({
+    ...k,
+    yemekler: k.yemekler.map((y) => ({
+      ...y,
+      uyari_alerjenler: y.alerjen_idler.filter((id) => harita.has(id)).map((id) => harita.get(id)),
+    })),
+  }));
+  const tumu = new Set(kategoriler.flatMap((k) => k.yemekler.flatMap((y) => y.uyari_alerjenler)));
+  return { kategoriler, alerjen_uyarisi: [...tumu].sort((a, b) => a.localeCompare(b, 'tr')) };
 }
 
 async function referanslar() {
@@ -46,6 +68,7 @@ function menuOlustur(satirlar) {
     rezervasyon_son: ilk.rezervasyon_son,
     ogrenci_fiyati: ilk.ogrenci_fiyati,
     personel_fiyati: ilk.personel_fiyati,
+    yarim_porsiyon_orani: ilk.yarim_porsiyon_orani,
     toplam_kalori: satirlar.reduce((t, s) => t + s.kalori, 0),
     tamami_vejetaryen: satirlar.every((s) => s.vejetaryen),
     kategoriler,
@@ -79,13 +102,17 @@ async function gununMenusu(oturum, sorgu) {
   if (!menu) return null;
 
   const db = await tutarlilik.okumaHavuzu(oturum.kullanici_id);
-  const [doluluk, durumlar] = await Promise.all([
+  const [doluluk, durumlar, alerjenHaritasi] = await Promise.all([
     menuVeri.menuDolulugu(db, menu.menu_id),
     rezervasyonVeri.menulerdekiDurum(db, oturum.kullanici_id, [menu.menu_id]),
+    profilServisi.kullaniciAlerjenHaritasi(oturum),
   ]);
+  const fiyat = fiyatSec(oturum.rol, menu);
   return {
     ...menu,
-    fiyat: fiyatSec(oturum.rol, menu),
+    ...alerjenUyarisiEkle(menu, alerjenHaritasi),
+    fiyat,
+    yarim_fiyat: yarimFiyat(fiyat, menu.yarim_porsiyon_orani),
     doluluk,
     rezervasyon: durumlar[menu.menu_id] || null,
   };
@@ -99,9 +126,10 @@ async function haftalikMenu(oturum, sorgu) {
 
   const db = await tutarlilik.okumaHavuzu(oturum.kullanici_id);
   const menuler = await menuVeri.dolulukListesi(db, yemekhaneId, baslangic, bitis);
-  const [icerikler, durumlar] = await Promise.all([
+  const [icerikler, durumlar, alerjenHaritasi] = await Promise.all([
     Promise.all(menuler.map((m) => menuIcerigi(m.yemekhane_id, m.tarih, m.ogun_id))),
     rezervasyonVeri.menulerdekiDurum(db, oturum.kullanici_id, menuler.map((m) => m.menu_id)),
+    profilServisi.kullaniciAlerjenHaritasi(oturum),
   ]);
 
   const gunler = [];
@@ -110,11 +138,14 @@ async function haftalikMenu(oturum, sorgu) {
   menuler.forEach((m, i) => {
     const gun = gunler.find((g) => g.tarih === m.tarih);
     const icerik = icerikler[i];
+    const fiyat = fiyatSec(oturum.rol, m);
     gun.menuler.push({
       menu_id: m.menu_id,
       ogun_id: m.ogun_id,
       ogun: m.ogun,
-      fiyat: fiyatSec(oturum.rol, m),
+      fiyat,
+      yarim_fiyat: yarimFiyat(fiyat, m.yarim_porsiyon_orani),
+      alerjen_uyarisi: icerik ? alerjenUyarisiEkle(icerik, alerjenHaritasi).alerjen_uyarisi : [],
       kapasite: m.kapasite,
       bos_yer: m.bos_yer,
       rezervasyon_son: m.rezervasyon_son,

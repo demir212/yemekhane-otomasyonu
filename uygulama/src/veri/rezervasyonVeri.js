@@ -2,8 +2,9 @@
 // Para hareketi yapan işlemler yalnızca stored procedure ile yapılır (kaynakta).
 const { yordamCagir } = require('./baglanti');
 
-function rezervasyonYap(kullaniciId, menuId) {
-  return yordamCagir('CALL sp_rezervasyon_yap(?, ?)', [kullaniciId, menuId]);
+// porsiyon: 'tam' | 'yarim' (Aşama 4: yordam 3 parametreli)
+function rezervasyonYap(kullaniciId, menuId, porsiyon) {
+  return yordamCagir('CALL sp_rezervasyon_yap(?, ?, ?)', [kullaniciId, menuId, porsiyon]);
 }
 
 function rezervasyonIptal(kullaniciId, rezervasyonId) {
@@ -12,7 +13,7 @@ function rezervasyonIptal(kullaniciId, rezervasyonId) {
 
 async function kullaniciRezervasyonlari(db, kullaniciId) {
   const [satirlar] = await db.query(
-    `SELECT r.id, r.menu_id, r.durum, r.ucret, r.olusturma, r.kullanma_zamani, r.iptal_zamani,
+    `SELECT r.id, r.menu_id, r.durum, r.porsiyon, r.ucret, r.olusturma, r.kullanma_zamani, r.iptal_zamani,
             m.tarih, o.ad AS ogun, yh.ad AS yemekhane,
             TIMESTAMP(m.tarih, o.son_saat) AS rezervasyon_son,
             (r.durum = 'aktif' AND NOW() < TIMESTAMP(m.tarih, o.son_saat)) AS iptal_edilebilir
@@ -27,15 +28,15 @@ async function kullaniciRezervasyonlari(db, kullaniciId) {
   return satirlar;
 }
 
-// Verilen menülerde kullanıcının rezervasyon durumu: { menu_id: {id, durum} }
+// Verilen menülerde kullanıcının rezervasyon durumu: { menu_id: {id, durum, porsiyon} }
 async function menulerdekiDurum(db, kullaniciId, menuIdler) {
   if (menuIdler.length === 0) return {};
   const [satirlar] = await db.query(
-    `SELECT id, menu_id, durum FROM rezervasyonlar
+    `SELECT id, menu_id, durum, porsiyon FROM rezervasyonlar
       WHERE kullanici_id = ? AND menu_id IN (?)`,
     [kullaniciId, menuIdler]
   );
-  return Object.fromEntries(satirlar.map((s) => [s.menu_id, { id: s.id, durum: s.durum }]));
+  return Object.fromEntries(satirlar.map((s) => [s.menu_id, { id: s.id, durum: s.durum, porsiyon: s.porsiyon }]));
 }
 
 module.exports = { rezervasyonYap, rezervasyonIptal, kullaniciRezervasyonlari, menulerdekiDurum };
