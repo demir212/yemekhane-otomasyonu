@@ -4,6 +4,7 @@ const ayar = require('./ayarlar');
 const rotalar = require('./rotalar');
 const hataYakalayici = require('./ara/hataYakalayici');
 const { hazir: redisHazir } = require('./veri/redisBaglanti');
+const menuOnbellegi = require('./servisler/menuOnbellegi');
 
 const app = express();
 app.disable('x-powered-by');
@@ -15,6 +16,8 @@ app.use(hataYakalayici);
 
 // Oturumlar Redis'te tutulduğu için Redis'e bağlanmadan istek kabul edilmez
 redisHazir
+  // Aşama 4: önbellekteki eski biçimli menü kayıtları istek kabul edilmeden önce silinir
+  .then(() => menuOnbellegi.eskiKayitlariTemizle())
   .then(() => {
     app.listen(ayar.port, () => {
       console.log(`[uygulama] ${ayar.port} portunda dinleniyor`);
